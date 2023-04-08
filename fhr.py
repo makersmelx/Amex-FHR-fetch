@@ -2,7 +2,10 @@ import requests
 from bs4 import BeautifulSoup, element as bs4Element
 import re
 import json
+from collections import defaultdict
 from cache import *
+
+fhrVisited = set()
 
 """
     Get urls for all FHR properties with the brand
@@ -43,6 +46,12 @@ def pullProperty(propertyLink, brand):
     name = re.sub(r"^(\S*)/travel/discover/property/", "", propertyLink)
     name = re.sub(r"\?linknav(\S*)$", "", name)
     name = re.sub(r"/", "-", name)
+
+    if name in fhrVisited:
+        return None
+    else:
+        print(f"Reading {name}...")
+        fhrVisited.add(name)
 
     propertyCache = f"{brand}/{name}"
     if isRelativePathExists(propertyCache):
@@ -110,12 +119,16 @@ def pullProperty(propertyLink, brand):
 
 
 def pullProperties():
-    cache = "properties.json"
+    listCache = "properties.json"
+    graphCache = "graph.json"
     properties = []
+    graph = defaultdict(list)
 
-    if isRelativePathExists(cache):
-        with open(getAbsolutePath(cache), "r+") as file:
+    if isRelativePathExists(listCache) and isRelativePathExists(graphCache):
+        with open(getAbsolutePath(listCache), "r+") as file:
             properties = json.loads(file.read())
+        with open(getAbsolutePath(graphCache), "r+") as file:
+            graph = json.loads(file.read())
     else:
         brandsCache = "brands"
         if (isRelativePathExists(brandsCache)):
@@ -134,9 +147,17 @@ def pullProperties():
             subLink = brand["href"]
             propertyLinks, brandName = pullPropertyUrlsByBrandLink(subLink)
             for propertyLink in propertyLinks:
-                print(propertyLink)
                 property = pullProperty(propertyLink, brandName)
+                if property is None:
+                    continue
+
+                index = len(properties)
                 properties.append(property)
-        with open(getAbsolutePath(cache), "w+") as file:
+                graph[property["city"]].append(index)
+                graph[property["brand"]].append(index)
+
+        with open(getAbsolutePath(listCache), "w+") as file:
             file.write(json.dumps(properties))
-    return properties
+        with open(getAbsolutePath(graphCache), "w+") as file:
+            file.write(json.dumps(graph))
+    return properties, graph

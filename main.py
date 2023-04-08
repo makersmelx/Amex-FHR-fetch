@@ -2,5 +2,5 @@ from cache import *
 from fhr import *
 
 if __name__ == "__main__":
-    properties = pullProperties()
+    properties, graph = pullProperties()
     print(len(properties))
