@@ -121,43 +121,50 @@ def pullProperty(propertyLink, brand):
 def pullProperties():
     listCache = "properties.json"
     graphCache = "graph.json"
+    # if we have the cache data for the property list and the property graph
+    caches = getAllCaches(listCache, graphCache)
+    if caches is not None:
+        return caches[0], caches[1]
+    # read through all cached hotel htmls, and make a graph by the hotel brand and city
     properties = []
-    graph = defaultdict(list)
+    graph = {
+        "city": defaultdict(list),
+        "brand": defaultdict(list),
+    }
 
-    if isRelativePathExists(listCache) and isRelativePathExists(graphCache):
-        with open(getAbsolutePath(listCache), "r+") as file:
-            properties = json.loads(file.read())
-        with open(getAbsolutePath(graphCache), "r+") as file:
-            graph = json.loads(file.read())
+    print("Please wait for the program to generate graphs...")
+    brandsCache = "brands"
+    # brand list could be cached. If we have that, read from file and skip
+    if (isRelativePathExists(brandsCache)):
+        with open(getAbsolutePath(brandsCache), "r+") as file:
+            htmlDoc = file.read()
     else:
-        brandsCache = "brands"
-        if (isRelativePathExists(brandsCache)):
-            with open(getAbsolutePath(brandsCache), "r+") as file:
-                htmlDoc = file.read()
-        else:
-            response = requests.get(
-                "https://www.americanexpress.com/en-us/travel/discover/brands")
-            htmlDoc = response.text
-            with open(getAbsolutePath(brandsCache), "w+") as file:
-                file.write(htmlDoc)
+        response = requests.get(
+            "https://www.americanexpress.com/en-us/travel/discover/brands")
+        htmlDoc = response.text
+        with open(getAbsolutePath(brandsCache), "w+") as file:
+            file.write(htmlDoc)
 
-        soup = BeautifulSoup(htmlDoc, 'html.parser')
-        brands = soup.find_all("a", class_="brand-tile")
-        for brand in brands:
-            subLink = brand["href"]
-            propertyLinks, brandName = pullPropertyUrlsByBrandLink(subLink)
-            for propertyLink in propertyLinks:
-                property = pullProperty(propertyLink, brandName)
-                if property is None:
-                    continue
+    soup = BeautifulSoup(htmlDoc, 'html.parser')
+    brands = soup.find_all("a", class_="brand-tile")
+    # for each brand, check all the hotels it have
+    for brand in brands:
+        subLink = brand["href"]
+        # for each hotel, we will first cache the hotel page if not done.
+        # Then make a hotel object from the html we have
+        propertyLinks, brandName = pullPropertyUrlsByBrandLink(subLink)
+        for propertyLink in propertyLinks:
+            property = pullProperty(propertyLink, brandName)
+            if property is None:
+                continue
 
-                index = len(properties)
-                properties.append(property)
-                graph[property["city"]].append(index)
-                graph[property["brand"]].append(index)
+            index = len(properties)
+            properties.append(property)
+            graph["city"][property["city"]].append(index)
+            graph["brand"][property["brand"]].append(index)
 
-        with open(getAbsolutePath(listCache), "w+") as file:
-            file.write(json.dumps(properties))
-        with open(getAbsolutePath(graphCache), "w+") as file:
-            file.write(json.dumps(graph))
+    with open(getAbsolutePath(listCache), "w+") as file:
+        file.write(json.dumps(properties))
+    with open(getAbsolutePath(graphCache), "w+") as file:
+        file.write(json.dumps(graph))
     return properties, graph

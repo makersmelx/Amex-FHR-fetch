@@ -2,3 +2,5 @@ cache/*
 *.md
 !readme.md
 *.pdf
+delivery/*
+.DS_Store
